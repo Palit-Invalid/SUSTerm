@@ -14,13 +14,14 @@
 #include <QSerialPort>
 #include <QSerialPortInfo>
 #include <QKeyEvent>
+#include <QRegExp>
 
 #include "ui_mainwindow.h"
 #include "constants.h"
 
 /**************************************************************************************************/
 
-enum terminal_modes { ASCII, HEX, ASCII_HEX };
+enum terminal_modes { ASCII = 0, HEX = 1, ASCII_HEX = 2 };
 
 namespace Ui {
 class MainWindow;
@@ -49,12 +50,26 @@ class MainWindow : public QMainWindow
         void SerialPortsChecks_timer_init(void);
         void OpenPort(void);
         void ClosePort(void);
-        void SerialSend(void);
+
         void PrintReceivedData(QTextBrowser* textBrowser0, QTextBrowser *textBrowser1,
                                terminal_modes mode);
         QString GetActualSystemTime(void);
 
+        QRegExp rx_parse;
+        QString fhver;
+        QString cvoice;
+        QString u2diag;
+        QString imei;
+        QString nck;
+        bool isInfoPressed = false;
+        int counter_parser = 0;;
+
+        QString lock_status;
+
+        void delay(int ms);
+
     private slots:
+        void SerialSend(QString qstr_to_send);
         void SerialPortsCheck(void);
         void ButtonOpenPressed(void);
         void ButtonClosePressed(void);
@@ -73,6 +88,10 @@ class MainWindow : public QMainWindow
         void MenuBarTimestampClick(void);
         void MenuBarTimestampMsClick(void);
         void MenuBarAboutClick(void);
+        void UnlockModem();
+        void getAllInfo();
+        void ParseAllInfo(QString qstr_to_parse);
+        QByteArray ConvertToHEX(QByteArray data);
 };
 
 /**************************************************************************************************/

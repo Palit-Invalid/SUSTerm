@@ -29,15 +29,21 @@ DEFINES += QT_DEPRECATED_WARNINGS
 CONFIG += c++11
 
 SOURCES += \
+    encrypt_v1.cpp \
     main.cpp \
     mainwindow.cpp
 
 HEADERS += \
+    encrypt_v1.h \
     mainwindow.h \
     constants.h
 
 FORMS += \
     mainwindow.ui
+
+DESTDIR = $$PWD/bin
+
+LIBS += -lssl -lcrypto
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

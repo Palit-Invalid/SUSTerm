@@ -1,4 +1,7 @@
 #include "mainwindow.h"
+#include "encrypt_v1.h"
+
+#include <QTimer>
 
 /**************************************************************************************************/
 
@@ -61,6 +64,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     connect(ui->action_Timestamp_with_ms, SIGNAL(triggered()), this,
             SLOT(MenuBarTimestampMsClick()));
     connect(ui->actionAbout, SIGNAL(triggered()), this, SLOT(MenuBarAboutClick()));
+
+    connect(ui->pushButton_allinfo, SIGNAL(clicked()), this, SLOT(getAllInfo()));
+    connect(ui->pushButton_unlock, SIGNAL(clicked()), this, SLOT(UnlockModem()));
 
     // Connect TextBrowsers Scrolls (scroll one of them move the other)
     current_slider_pos_v = 0;
@@ -146,6 +152,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     send_history_i = -1;
 
     debug_print("Setup process end.\n");
+
+
 }
 
 // Main Window Destructor
@@ -241,6 +249,12 @@ void MainWindow::ButtonOpenPressed(void)
 // Button Close pressed event handler
 void MainWindow::ButtonClosePressed(void)
 {
+    imei = "";
+    ui->label_imei->setText("IMEI:");
+    ui->label_lockstatus->setText("Lock status:");
+    ui->label_fhver->setText("FHVER:");
+    ui->label_cvoice->setText("CVOICE:");
+    ui->label_u2diag->setText("U2DIAG:");
     debug_print("Close Button pressed.");
     ClosePort();
 }
@@ -278,7 +292,7 @@ void MainWindow::OpenPort(void)
         serial_port->clear();
 
         ui->label_status->setStyleSheet("QLabel { color : blue; }");
-        ui->label_status->setText("Status: Connected.");
+        ui->label_status->setText(status[0]);
 
         // Change enable/disable states of UI elements
         ui->pushButton_close->setEnabled(true);
@@ -303,7 +317,7 @@ void MainWindow::ClosePort(void)
         debug_print("Port successfully close.");
 
         ui->label_status->setStyleSheet("QLabel { color : black; }");
-        ui->label_status->setText("Status: Disconnected.");
+        ui->label_status->setText(status[1]);
     }
 
     // Change enable/disable states of UI elements
@@ -405,6 +419,14 @@ void MainWindow::PrintReceivedData(QTextBrowser* textBrowser0, QTextBrowser *tex
 
                 // Remove carriage return characters
                 QString qstr_to_print_ascii(to_print_ascii);
+
+                if(isInfoPressed)
+                {
+                    rx_parse.setPattern(regexp.at(counter_parser));
+                    if(qstr_to_print_ascii.contains(rx_parse))
+                        ParseAllInfo(qstr_to_print_ascii);
+                }
+
                 qstr_to_print_ascii = qstr_to_print_ascii.remove(QChar('\r'));
 
                 // Add time to data if it is not the first line
@@ -756,18 +778,18 @@ QString MainWindow::GetActualSystemTime(void)
 void MainWindow::ButtonSendPressed(void)
 {
     debug_print("Send Button pressed.");
-    SerialSend();
+    SerialSend(ui->lineEdit_toSend->text());
     ui->lineEdit_toSend->clear();
     ui->lineEdit_toSend->setFocus();
 }
 
 // Serial send data from lineEdit box
-void MainWindow::SerialSend(void)
+void MainWindow::SerialSend(QString qstr_to_send)
 {
     QScrollBar* vertical_bar = ui->textBrowser_serial_0->verticalScrollBar();
 
     // Check if to send data box is empty
-    QString qstr_to_send = ui->lineEdit_toSend->text();
+    //QString qstr_to_send = ui->lineEdit_toSend->text();
     if(qstr_to_send.isNull())
     {
         debug_print("Data to send box is null.");
@@ -815,8 +837,12 @@ void MainWindow::SerialSend(void)
     if(serial_port->isWritable())
     {
         // Convert QString to QByteArray to send a char* type
-        QByteArray qba_to_send = qstr_to_send.toUtf8();
-        serial_port->write(qba_to_send.data());
+        if(serial_port->isWritable())
+        {
+            // Convert QString to QByteArray to send a char* type
+            QByteArray qba_to_send = qstr_to_send.toUtf8();
+            serial_port->write(qba_to_send.data());
+        }
     }
 
     // Check autoscroll and go to bottom
@@ -1035,4 +1061,111 @@ void MainWindow::MenuBarAboutClick(void)
 
     // Execute the Dialog (show() instead dont block parent user interactions)
     dialog->exec();
+}
+
+void MainWindow::UnlockModem()
+{
+    if(imei.isEmpty())
+        getAllInfo();
+    char nckbuf[40];
+    char imeibuf[16];
+    char nck_phrase[] = "hwe620datacard";
+    //char upgrade_phrase[] = "e630upgrade";
+    strncpy(imeibuf, imei.toLocal8Bit(), 15);
+
+    encrypt_v1(imeibuf, nckbuf, nck_phrase);
+    nck = QString::fromLocal8Bit(nckbuf);
+    //ui->lineEdit_toSend->setText((QString("AT^CARDLOCK=\"%1\"").arg(nck)));
+
+    SerialSend(QString("AT^CARDLOCK=\"%1\"").arg(nck));
+    delay(10);
+    SerialSend(QString("AT^U2DIAG=0"));
+
+}
+
+void MainWindow::delay(int ms)
+{
+    QTimer timer;
+    timer.setInterval(ms);
+    QEventLoop loop;
+    connect(&timer, SIGNAL(timeout()), &loop, SLOT(quit()));
+    timer.start();
+    loop.exec();
+}
+
+void MainWindow::getAllInfo()
+{
+    isInfoPressed = true;
+    for (counter_parser = 0; counter_parser < infoCommands.size(); ++counter_parser)
+    {
+        SerialSend(infoCommands.at(counter_parser));
+        delay(10);
+    }
+    isInfoPressed = false;
+}
+
+void MainWindow::ParseAllInfo(QString qstr_to_parse)
+{
+    switch(counter_parser)
+    {
+        case 0:
+            imei = qstr_to_parse;
+            ui->label_imei->setText(QString("IMEI: %1").arg(imei));
+            break;
+        case 1:
+            lock_status = qstr_to_parse;
+            lock_status.remove(0, 11);
+            lock_status.remove(1, 6);
+
+            if(lock_status == "2")
+                lock_status = "UNBLOCKED";
+            else if(lock_status == "1")
+                lock_status = "BLOCKED";
+            else
+                lock_status = "UNKNOWN";
+
+            ui->label_lockstatus->setText(QString("Lock status: %1").arg(lock_status));
+            break;
+        case 2:
+            fhver = qstr_to_parse;
+            fhver.remove(0, 7);
+            ui->label_fhver->setText(QString("FHVER: %1").arg(fhver));
+            break;
+        case 3:
+            cvoice = qstr_to_parse;
+            cvoice.remove(0, 9);
+            cvoice.remove(1, 2);
+
+            if(cvoice == "0")
+                cvoice = "ENABLE";
+            else if(cvoice == "1")
+                cvoice = "DISABLE";
+            else
+                cvoice = "UNKNOWN";
+
+            ui->label_cvoice->setText(QString("CVOICE: %1").arg(cvoice));
+            break;
+        case 4:
+            u2diag = qstr_to_parse;
+            ui->label_u2diag->setText(QString("U2DIAG: %1").arg(u2diag));
+    }
+}
+
+QByteArray MainWindow::ConvertToHEX(QByteArray data)
+{
+    QByteArray to_print_hex = data.toHex();
+    to_print_hex = to_print_hex.toUpper();
+    if(to_print_hex.length() > 2)
+    {
+        // Add spaces between pair of bytes of hex data (convert "A2345F" to "A2 34 5F")
+        for(int ii = 2; ii < to_print_hex.length()-1; ii = ii + 3)
+            to_print_hex.insert(ii, " ");
+        to_print_hex.append(' ');
+    } else if (to_print_hex.length() == 2)
+    {
+        // If there is just one byte and is an EOL, add a space
+        if(to_print_hex[0] != '\n')
+            to_print_hex.append(' ');
+    }
+    return to_print_hex;
 }

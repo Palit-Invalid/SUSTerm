@@ -15,6 +15,12 @@
 
 /**************************************************************************************************/
 
+QStringList static status =
+{
+    "Status: connected",
+    "Status: disconnected"
+};
+
 QStringList static comboBox_EOL_values =
 {
     "No Line Ending",
@@ -29,7 +35,7 @@ QStringList static EOL_values =
     "\r",
     "\r\n"
 };
-const int eol_default_value = 1; // 1 = New Line
+const int eol_default_value = 3; // 1 = New Line
 
 QStringList static comboBox_bauds_values =
 {
@@ -51,6 +57,28 @@ QStringList static comboBox_bauds_values =
 };
 const int bauds_default_value = 9; // 9 = 115200
 
+QStringList static infoCommands =
+{
+    "AT+CGSN",
+    "AT^CARDLOCK?",
+    "AT^FHVER",
+    "AT^CVOICE=?",
+    "AT^U2DIAG?"
+};
+
+//"AT^FHVER",
+//"AT^U2DIAG?",
+//"AT^CVOICE=?"
+
+QStringList static regexp =
+{
+    "\\d{15,15}",
+    "^\\^CARDLOCK: \\d,\\d\\d?,0",
+    "^\\^FHVER",
+    "^\\^CVOICE",
+    "^\\d"
+};
+
 const QString ABOUT_TEXT =
     "SUSTerm (Simple Universal Serial Terminal) is a free and open GNU-GPL software which is " \
     "focused in minimalist and be efficiently fast and easy to use.<br/>" \
@@ -67,6 +95,8 @@ const QString ABOUT_TEXT =
     "&nbsp;&nbsp;&nbsp;&nbsp;" \
     "BTC    - 3N9wf3FunR6YNXonquBeWammaBZVzTXTyR" \
     "<p dir=\"rtl\">(: Enjoy this Terminal</p>";
+
+static const char blankString[] = "N/A";
 
 /**************************************************************************************************/
 
