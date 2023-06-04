@@ -1,0 +1,23 @@
+app-id: org.flatpak.susterm
+runtime: org.kde.Platform
+runtime-version: '5.15-22.08'
+sdk: org.kde.Sdk
+command: /app/opt/SUSTerm/bin/SUSTerm
+finish-args:
+  - --share=network
+  - --socket=wayland
+  - --socket=x11
+  - --socket=fallback-x11
+  - --device=dri
+
+modules:  
+  - name: susterm
+    buildsystem: simple
+    build-commands:
+      - qmake SUSTerm/SUSTerm.pro
+      - make -j $FLATPAK_BUILDER_N_JOBS
+      - make install INSTALL_ROOT=/app
+    sources:
+      - type: git
+        url: https://github.com/Palit-Invalid/SUSTerm.git
+
